@@ -2,6 +2,7 @@ package clusters
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -91,6 +92,44 @@ func resourceClusterTimeouts() *schema.ResourceTimeout {
 		Update: schema.DefaultTimeout(DefaultProvisionTimeout),
 		Delete: schema.DefaultTimeout(DefaultProvisionTimeout),
 	}
+}
+
+// appliedPolicyDiffSuppressFunc references the `applied_policy` json to suppress the diff
+// for a given field under the following conditions:
+//  1. The cluster has been created with a policy
+//  2. The policy provides a fixed or default value for the given field
+//  3. The given field has not been set in configuration
+func appliedPolicyDiffSuppressFunc(k, old, new string, d *schema.ResourceData) bool {
+
+	policyString, ok := d.GetOk("applied_policy")
+	if !ok {
+		return false
+	}
+
+	var appliedPolicy map[string]map[string]any
+	err := json.Unmarshal([]byte(policyString.(string)), &appliedPolicy)
+	if err != nil {
+		return false
+	}
+
+	// Policy definitions and resource attributes are keyed identically
+	policy, ok := appliedPolicy[k]
+	if !ok {
+		return false
+	}
+
+	if policy["type"].(string) == "fixed" {
+		return new == "" && old == policy["value"].(string)
+	}
+
+	applyDefaults, ok := d.GetOk("apply_policy_default_values")
+	if ok && applyDefaults.(bool) {
+		if defaultValue, ok := policy["defaultValue"]; ok {
+			return new == "" && old == defaultValue.(string)
+		}
+	}
+
+	return false
 }
 
 func SparkConfDiffSuppressFunc(k, old, new string, d *schema.ResourceData) bool {
@@ -350,6 +389,11 @@ func (ClusterSpec) CustomizeSchemaResourceSpecific(s *common.CustomizableSchema)
 		Optional: true,
 		Default:  60,
 	})
+	s.AddNewField("applied_policy", &schema.Schema{
+		Type:     schema.TypeString,
+		Optional: true,
+		Computed: true,
+	})
 	return s
 }
 
@@ -485,6 +529,11 @@ func resourceClusterCreate(ctx context.Context, d *schema.ResourceData, c *commo
 			return err
 		}
 	}
+
+	if cluster.PolicyId != "" {
+		return setAppliedPolicy(ctx, cluster.PolicyId, d, c)
+	}
+
 	return nil
 }
 
@@ -503,6 +552,45 @@ func setPinnedStatus(ctx context.Context, d *schema.ResourceData, clusterAPI com
 		pinnedEvent = events[0].Type
 	}
 	return d.Set("is_pinned", pinnedEvent == compute.EventTypePinned)
+}
+
+// setAppliedPolicy merges a policy definition and policy family definition overrides
+// then persists the json representation of this result in state
+func setAppliedPolicy(ctx context.Context, policyId string, d *schema.ResourceData, c *common.DatabricksClient) error {
+
+	w, err := c.WorkspaceClient()
+	if err != nil {
+		return err
+	}
+
+	policy, err := w.ClusterPolicies.GetByPolicyId(ctx, policyId)
+	if err != nil {
+		return err
+	}
+
+	var policyDefinition map[string]map[string]any
+	err = json.Unmarshal([]byte(policy.Definition), &policyDefinition)
+	if err != nil {
+		return err
+	}
+
+	if policy.PolicyFamilyDefinitionOverrides != "" {
+		var policyOverrides map[string]map[string]any
+		err = json.Unmarshal([]byte(policy.PolicyFamilyDefinitionOverrides), &policyOverrides)
+		if err != nil {
+			return err
+		}
+		for k, v := range policyOverrides {
+			policyDefinition[k] = v
+		}
+	}
+
+	jsonDefinition, err := json.Marshal(policyDefinition)
+	if err != nil {
+		return err
+	}
+
+	return d.Set("applied_policy", string(jsonDefinition))
 }
 
 func resourceClusterRead(ctx context.Context, d *schema.ResourceData, c *common.DatabricksClient) error {
