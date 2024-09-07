@@ -632,7 +632,7 @@ func TestDiffSuppressor(t *testing.T) {
 	stringSchema := &schema.Schema{
 		Type: schema.TypeString,
 	}
-	dsf := diffSuppressor("foo", stringSchema)
+	dsf := DiffSuppressor("foo", stringSchema)
 	d := schema.TestResourceDataRaw(t, map[string]*schema.Schema{
 		"foo": {
 			Type:     schema.TypeBool,
@@ -649,7 +649,7 @@ func TestDiffSuppressorWhenNumberExplicitlyChangedToZero(t *testing.T) {
 	intSchema := &schema.Schema{
 		Type: schema.TypeInt,
 	}
-	dsf := diffSuppressor("foo", intSchema)
+	dsf := DiffSuppressor("foo", intSchema)
 	noChange := schema.TestResourceDataRaw(t, map[string]*schema.Schema{
 		"foo": {
 			Type:     schema.TypeInt,

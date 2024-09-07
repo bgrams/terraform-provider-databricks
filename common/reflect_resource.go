@@ -339,7 +339,7 @@ func handleSuppressDiff(typeField reflect.StructField, fieldName string, v *sche
 	tfTags := strings.Split(typeField.Tag.Get("tf"), ",")
 	for _, tag := range tfTags {
 		if tag == "suppress_diff" {
-			v.DiffSuppressFunc = diffSuppressor(fieldName, v)
+			v.DiffSuppressFunc = DiffSuppressor(fieldName, v)
 			break
 		}
 	}
@@ -363,7 +363,7 @@ func chooseFieldName(typeField reflect.StructField) string {
 	return getJsonFieldName(typeField)
 }
 
-func diffSuppressor(fieldName string, v *schema.Schema) func(k, old, new string, d *schema.ResourceData) bool {
+func DiffSuppressor(fieldName string, v *schema.Schema) schema.SchemaDiffSuppressFunc {
 	zero := fmt.Sprintf("%v", v.Type.Zero())
 	return func(k, old, new string, d *schema.ResourceData) bool {
 		// HasChange allows to check if the field is explicitly changed in the configuration.
@@ -472,9 +472,9 @@ func typeToSchema(v reflect.Value, aliases map[string]map[string]string, tc trac
 			sv := reflect.New(elem).Elem()
 			nestedSchema := typeToSchema(sv, aliases, tc.withPath(fieldName, scm[fieldName]))
 			if strings.Contains(tfTag, "suppress_diff") {
-				scm[fieldName].DiffSuppressFunc = diffSuppressor(fieldName, scm[fieldName])
+				scm[fieldName].DiffSuppressFunc = DiffSuppressor(fieldName, scm[fieldName])
 				for k, v := range nestedSchema {
-					v.DiffSuppressFunc = diffSuppressor(k, v)
+					v.DiffSuppressFunc = DiffSuppressor(k, v)
 				}
 			}
 			scm[fieldName].Elem = &schema.Resource{
@@ -489,9 +489,9 @@ func typeToSchema(v reflect.Value, aliases map[string]map[string]string, tc trac
 
 			nestedSchema := typeToSchema(sv, aliases, tc.withPath(fieldName, scm[fieldName]))
 			if strings.Contains(tfTag, "suppress_diff") {
-				scm[fieldName].DiffSuppressFunc = diffSuppressor(fieldName, scm[fieldName])
+				scm[fieldName].DiffSuppressFunc = DiffSuppressor(fieldName, scm[fieldName])
 				for k, v := range nestedSchema {
-					v.DiffSuppressFunc = diffSuppressor(k, v)
+					v.DiffSuppressFunc = DiffSuppressor(k, v)
 				}
 			}
 			scm[fieldName].Elem = &schema.Resource{

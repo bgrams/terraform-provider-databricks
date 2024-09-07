@@ -12,10 +12,36 @@ import (
 )
 
 type CustomizableSchema struct {
-	Schema         *schema.Schema
-	path           []string
-	isSuppressDiff bool
-	context        schemaPathContext
+	Schema              *schema.Schema
+	path                []string
+	isSuppressDiff      bool
+	namedDiffSuppressor NamedDiffSuppressor
+	context             schemaPathContext
+}
+
+func ComposedDiffSuppressFunc(fn ...schema.SchemaDiffSuppressFunc) schema.SchemaDiffSuppressFunc {
+	return func(k, oldValue, newValue string, d *schema.ResourceData) bool {
+		for _, f := range fn {
+			if f(k, oldValue, newValue, d) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+type NamedDiffSuppressor func(fieldName string, v *schema.Schema) schema.SchemaDiffSuppressFunc
+
+func (s *CustomizableSchema) SetNamedDiffSuppressor(d NamedDiffSuppressor) *CustomizableSchema {
+	s.namedDiffSuppressor = d
+	return s
+}
+
+func (s *CustomizableSchema) GetDiffSuppressFunc(name string, schema *schema.Schema) schema.SchemaDiffSuppressFunc {
+	if s.namedDiffSuppressor != nil {
+		return s.namedDiffSuppressor(name, schema)
+	}
+	return DiffSuppressor(name, schema)
 }
 
 func (s *CustomizableSchema) pathContainsMultipleItemsList() bool {
@@ -117,7 +143,8 @@ func (s *CustomizableSchema) SetRequired() *CustomizableSchema {
 }
 
 func (s *CustomizableSchema) SetSuppressDiff() *CustomizableSchema {
-	s.Schema.DiffSuppressFunc = diffSuppressor(s.path[len(s.path)-1], s.Schema)
+
+	s.Schema.DiffSuppressFunc = s.GetDiffSuppressFunc(s.path[len(s.path)-1], s.Schema)
 	s.isSuppressDiff = true
 	if s.Schema.Type == schema.TypeList && s.Schema.MaxItems == 1 {
 		// If it is a list with max items = 1, it means the corresponding sdk schema type is a struct or a ptr.
@@ -128,7 +155,7 @@ func (s *CustomizableSchema) SetSuppressDiff() *CustomizableSchema {
 		}
 		nestedSchema := resource.Schema
 		for k, v := range nestedSchema {
-			v.DiffSuppressFunc = diffSuppressor(k, v)
+			v.DiffSuppressFunc = s.GetDiffSuppressFunc(k, v)
 		}
 	}
 	return s
@@ -260,7 +287,7 @@ func (s *CustomizableSchema) AddNewField(key string, newField *schema.Schema) *C
 	}
 	scm[key] = newField
 	if s.isSuppressDiff {
-		newField.DiffSuppressFunc = diffSuppressor(key, newField)
+		newField.DiffSuppressFunc = s.GetDiffSuppressFunc(key, newField)
 	}
 	return s
 }

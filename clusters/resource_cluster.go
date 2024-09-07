@@ -398,13 +398,18 @@ func (ClusterSpec) CustomizeSchemaResourceSpecific(s *common.CustomizableSchema)
 }
 
 func (ClusterSpec) CustomizeSchema(s *common.CustomizableSchema) *common.CustomizableSchema {
-	s.SchemaPath("enable_elastic_disk").SetComputed()
-	s.SchemaPath("enable_local_disk_encryption").SetComputed()
-	s.SchemaPath("node_type_id").SetComputed().SetConflictsWith([]string{"driver_instance_pool_id", "instance_pool_id"})
-	s.SchemaPath("driver_node_type_id").SetComputed().SetConflictsWith([]string{"driver_instance_pool_id", "instance_pool_id"})
-	s.SchemaPath("driver_instance_pool_id").SetComputed().SetConflictsWith([]string{"driver_node_type_id", "node_type_id"})
-	s.SchemaPath("ssh_public_keys").SetMaxItems(10)
-	s.SchemaPath("init_scripts").SetMaxItems(10)
+
+	s.SetNamedDiffSuppressor(func(name string, schema *schema.Schema) schema.SchemaDiffSuppressFunc {
+		return common.ComposedDiffSuppressFunc(common.DiffSuppressor(name, schema), appliedPolicyDiffSuppressFunc)
+	})
+
+	s.SchemaPath("enable_elastic_disk").SetComputed().SetSuppressDiff()
+	s.SchemaPath("enable_local_disk_encryption").SetComputed().SetSuppressDiff()
+	s.SchemaPath("node_type_id").SetComputed().SetSuppressDiff().SetConflictsWith([]string{"driver_instance_pool_id", "instance_pool_id"})
+	s.SchemaPath("driver_node_type_id").SetComputed().SetSuppressDiff().SetConflictsWith([]string{"driver_instance_pool_id", "instance_pool_id"})
+	s.SchemaPath("driver_instance_pool_id").SetComputed().SetSuppressDiff().SetConflictsWith([]string{"driver_node_type_id", "node_type_id"})
+	s.SchemaPath("ssh_public_keys").SetSuppressDiff().SetMaxItems(10)
+	s.SchemaPath("init_scripts").SetSuppressDiff().SetMaxItems(10)
 	s.SchemaPath("init_scripts", "dbfs").SetDeprecated(DbfsDeprecationWarning)
 	s.SchemaPath("init_scripts", "dbfs", "destination").SetRequired()
 	s.SchemaPath("init_scripts", "s3", "destination").SetRequired()
@@ -426,11 +431,12 @@ func (ClusterSpec) CustomizeSchema(s *common.CustomizableSchema) *common.Customi
 	s.SchemaPath("docker_image", "url").SetRequired()
 	s.SchemaPath("docker_image", "basic_auth", "password").SetRequired().SetSensitive()
 	s.SchemaPath("docker_image", "basic_auth", "username").SetRequired()
-	s.SchemaPath("spark_conf").SetCustomSuppressDiff(SparkConfDiffSuppressFunc)
+	s.SchemaPath("spark_conf").SetCustomSuppressDiff(common.ComposedDiffSuppressFunc(appliedPolicyDiffSuppressFunc, SparkConfDiffSuppressFunc))
 	s.SchemaPath("aws_attributes").SetSuppressDiff().SetConflictsWith([]string{"azure_attributes", "gcp_attributes"})
-	s.SchemaPath("aws_attributes", "zone_id").SetCustomSuppressDiff(ZoneDiffSuppress)
+	s.SchemaPath("aws_attributes", "zone_id").SetCustomSuppressDiff(common.ComposedDiffSuppressFunc(appliedPolicyDiffSuppressFunc, ZoneDiffSuppress))
 	s.SchemaPath("azure_attributes").SetSuppressDiff().SetConflictsWith([]string{"aws_attributes", "gcp_attributes"})
 	s.SchemaPath("gcp_attributes").SetSuppressDiff().SetConflictsWith([]string{"aws_attributes", "azure_attributes"})
+	s.SchemaPath("autoscale").SetSuppressDiff()
 	s.SchemaPath("autoscale", "max_workers").SetOptional()
 	s.SchemaPath("autoscale", "min_workers").SetOptional()
 	s.SchemaPath("cluster_log_conf", "dbfs", "destination").SetRequired()
@@ -440,9 +446,9 @@ func (ClusterSpec) CustomizeSchema(s *common.CustomizableSchema) *common.Customi
 		Type:     schema.TypeString,
 		Computed: true,
 	})
-	s.SchemaPath("instance_pool_id").SetConflictsWith([]string{"driver_node_type_id", "node_type_id"})
-	s.SchemaPath("runtime_engine").SetValidateFunc(validation.StringInSlice([]string{"PHOTON", "STANDARD"}, false))
-	s.SchemaPath("num_workers").SetDefault(0).SetValidateDiagFunc(validation.ToDiagFunc(validation.IntAtLeast(0)))
+	s.SchemaPath("instance_pool_id").SetSuppressDiff().SetConflictsWith([]string{"driver_node_type_id", "node_type_id"})
+	s.SchemaPath("runtime_engine").SetSuppressDiff().SetValidateFunc(validation.StringInSlice([]string{"PHOTON", "STANDARD"}, false))
+	s.SchemaPath("num_workers").SetSuppressDiff().SetDefault(0).SetValidateDiagFunc(validation.ToDiagFunc(validation.IntAtLeast(0)))
 	s.AddNewField("cluster_mount_info", &schema.Schema{
 		Type:     schema.TypeList,
 		Optional: true,
