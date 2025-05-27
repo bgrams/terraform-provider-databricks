@@ -29,6 +29,7 @@ type Resource struct {
 	DeprecationMessage              string
 	Importer                        *schema.ResourceImporter
 	CanSkipReadAfterCreateAndUpdate func(d *schema.ResourceData) bool
+	ValidateRawResourceConfigFuncs  []schema.ValidateRawResourceConfigFunc
 }
 
 func nicerError(ctx context.Context, err error, action string) error {
@@ -114,7 +115,7 @@ func (r Resource) ToResource() *schema.Resource {
 			head := queue[0]
 			queue = queue[1:]
 			for _, v := range head.Schema {
-				if v.Computed {
+				if v.Computed || v.WriteOnly {
 					continue
 				}
 				if nested, ok := v.Elem.(*schema.Resource); ok {
@@ -149,15 +150,16 @@ func (r Resource) ToResource() *schema.Resource {
 		}
 	}
 	resource := &schema.Resource{
-		Schema:             r.Schema,
-		SchemaVersion:      r.SchemaVersion,
-		StateUpgraders:     r.StateUpgraders,
-		CustomizeDiff:      r.saferCustomizeDiff(),
-		ReadContext:        generateReadFunc(ignoreMissingForRead),
-		UpdateContext:      update,
-		Importer:           r.Importer,
-		Timeouts:           r.Timeouts,
-		DeprecationMessage: r.DeprecationMessage,
+		Schema:                         r.Schema,
+		SchemaVersion:                  r.SchemaVersion,
+		StateUpgraders:                 r.StateUpgraders,
+		CustomizeDiff:                  r.saferCustomizeDiff(),
+		ReadContext:                    generateReadFunc(ignoreMissingForRead),
+		UpdateContext:                  update,
+		Importer:                       r.Importer,
+		Timeouts:                       r.Timeouts,
+		DeprecationMessage:             r.DeprecationMessage,
+		ValidateRawResourceConfigFuncs: r.ValidateRawResourceConfigFuncs,
 	}
 	if r.Create != nil {
 		resource.CreateContext = func(ctx context.Context, d *schema.ResourceData, m any) diag.Diagnostics {

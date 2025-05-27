@@ -8,6 +8,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/apierr"
 	"github.com/databricks/databricks-sdk-go/service/workspace"
 	"github.com/databricks/terraform-provider-databricks/common"
+	"github.com/hashicorp/go-cty/cty"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -40,11 +41,25 @@ func ResourceSecret() common.Resource {
 	p := common.NewPairSeparatedID("scope", "key", "|||")
 	s := map[string]*schema.Schema{
 		"string_value": {
-			Type:         schema.TypeString,
-			ValidateFunc: validation.StringIsNotEmpty,
-			Required:     true,
-			ForceNew:     true,
-			Sensitive:    true,
+			Type:          schema.TypeString,
+			ValidateFunc:  validation.StringIsNotEmpty,
+			ConflictsWith: []string{"string_value_wo"},
+			ForceNew:      true,
+			Sensitive:     true,
+			Optional:      true,
+		},
+		"string_value_wo": {
+			Type:          schema.TypeString,
+			ConflictsWith: []string{"string_value"},
+			RequiredWith:  []string{"string_value_wo_version"},
+			Optional:      true,
+			Sensitive:     true,
+			WriteOnly:     true,
+		},
+		"string_value_wo_version": {
+			Type:         schema.TypeInt,
+			RequiredWith: []string{"string_value_wo"},
+			Optional:     true,
 		},
 		"scope": {
 			Type:         schema.TypeString,
@@ -76,6 +91,16 @@ func ResourceSecret() common.Resource {
 			}
 			var putSecretReq workspace.PutSecret
 			common.DataToStructPointer(d, s, &putSecretReq)
+
+			stringValueWO, err := common.GetWriteOnlyStringValue(d, cty.GetAttrPath("string_value_wo"))
+			if err != nil {
+				return err
+			}
+
+			if stringValueWO != "" {
+				putSecretReq.StringValue = stringValueWO
+			}
+
 			err = w.Secrets.PutSecret(ctx, putSecretReq)
 			if err != nil {
 				return err
@@ -112,6 +137,9 @@ func ResourceSecret() common.Resource {
 				Scope: scope,
 				Key:   key,
 			})
+		},
+		ValidateRawResourceConfigFuncs: []schema.ValidateRawResourceConfigFunc{
+			validation.PreferWriteOnlyAttribute(cty.GetAttrPath("string_value"), cty.GetAttrPath("string_value_wo")),
 		},
 	}
 }
