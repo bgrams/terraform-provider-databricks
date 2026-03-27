@@ -28,7 +28,6 @@ var credentialSchema = common.StructToSchema(catalog.CredentialInfo{},
 			common.CustomizeSchemaPath(m, computed).SetComputed()
 		}
 
-		common.CustomizeSchemaPath(m, "name").SetForceNew()
 		common.CustomizeSchemaPath(m, "databricks_gcp_service_account").SetComputed()
 		common.CustomizeSchemaPath(m, "databricks_gcp_service_account", "email").SetComputed()
 		common.CustomizeSchemaPath(m, "databricks_gcp_service_account", "credential_id").SetComputed()
@@ -142,6 +141,9 @@ func ResourceCredential() common.Resource {
 
 			if !d.HasChangeExcept("owner") {
 				return nil
+			}
+			if d.HasChange("name") {
+				updateCredRequest.NewName = d.Get("name").(string)
 			}
 			if d.HasChange("read_only") {
 				updateCredRequest.ForceSendFields = append(updateCredRequest.ForceSendFields, "ReadOnly")

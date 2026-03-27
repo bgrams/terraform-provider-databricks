@@ -158,19 +158,20 @@ func TestCreateIsolatedCredential(t *testing.T) {
 	})
 }
 
-func TestUpdateCredentialSchemaForceNew(t *testing.T) {
+func TestUpdateCredentialSchema(t *testing.T) {
 	qa.ResourceFixture{
 		MockWorkspaceClientFunc: func(w *mocks.MockWorkspaceClient) {
 			e := w.GetMockCredentialsAPI().EXPECT()
 			e.UpdateCredential(mock.Anything, catalog.UpdateCredentialRequest{
 				NameArg: "name",
+				NewName: "rename",
 				AwsIamRole: &catalog.AwsIamRole{
 					RoleArn: "arn:aws:iam::account:role/role",
 				},
 				Comment: "comment",
 			}).Return(&catalog.CredentialInfo{
 				Id:   "1234-5678",
-				Name: "name",
+				Name: "rename",
 				AwsIamRole: &catalog.AwsIamRole{
 					RoleArn: "arn:aws:iam::account:role/role",
 				},
@@ -186,10 +187,9 @@ func TestUpdateCredentialSchemaForceNew(t *testing.T) {
 				Comment: "comment",
 			}, nil)
 		},
-		RequiresNew: true,
-		Resource:    ResourceCredential(),
-		Update:      true,
-		ID:          "name",
+		Resource: ResourceCredential(),
+		Update:   true,
+		ID:       "name",
 		InstanceState: map[string]string{
 			"name":                    "name",
 			"purpose":                 "SERVICE",
