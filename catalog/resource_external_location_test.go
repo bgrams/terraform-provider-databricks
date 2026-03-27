@@ -329,9 +329,10 @@ func TestUpdateExternalLocationName(t *testing.T) {
 		Fixtures: []qa.HTTPFixture{
 			{
 				Method:   "PATCH",
-				Resource: "/api/2.1/unity-catalog/external-locations/abc",
+				Resource: "/api/2.1/unity-catalog/external-locations/abc-old",
 				ExpectedRequest: catalog.UpdateExternalLocation{
 					Url:            "s3://foo/bar",
+					NewName:        "abc",
 					CredentialName: "bcd",
 					Comment:        "def",
 					ReadOnly:       false,
@@ -339,7 +340,7 @@ func TestUpdateExternalLocationName(t *testing.T) {
 			},
 			{
 				Method:   "GET",
-				Resource: "/api/2.1/unity-catalog/external-locations/abc?",
+				Resource: "/api/2.1/unity-catalog/external-locations/abc-old?",
 				Response: catalog.ExternalLocationInfo{
 					Name:           "abc",
 					Url:            "s3://foo/bar",
@@ -348,10 +349,9 @@ func TestUpdateExternalLocationName(t *testing.T) {
 				},
 			},
 		},
-		Resource:    ResourceExternalLocation(),
-		Update:      true,
-		RequiresNew: true,
-		ID:          "abc",
+		Resource: ResourceExternalLocation(),
+		Update:   true,
+		ID:       "abc-old",
 		InstanceState: map[string]string{
 			"name":            "abc-old",
 			"url":             "s3://foo/bar",

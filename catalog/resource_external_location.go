@@ -31,7 +31,7 @@ func ResourceExternalLocation() common.Resource {
 				return old == "false" && new == "true"
 			}
 			common.CustomizeSchemaPath(m, "url").SetRequired().SetCustomSuppressDiff(ucDirectoryPathSlashOnlySuppressDiff)
-			common.CustomizeSchemaPath(m, "name").SetRequired().SetForceNew().SetCustomSuppressDiff(common.EqualFoldDiffSuppress)
+			common.CustomizeSchemaPath(m, "name").SetRequired().SetCustomSuppressDiff(common.EqualFoldDiffSuppress)
 			common.CustomizeSchemaPath(m, "credential_name").SetRequired()
 			common.CustomizeSchemaPath(m, "isolation_mode").SetComputed()
 			common.CustomizeSchemaPath(m, "owner").SetComputed()
@@ -130,7 +130,6 @@ func ResourceExternalLocation() common.Resource {
 					return err
 				}
 			}
-
 			if !d.HasChangeExcept("owner") {
 				return nil
 			}
@@ -140,6 +139,11 @@ func ResourceExternalLocation() common.Resource {
 					updateExternalLocationRequest.ForceSendFields = append(updateExternalLocationRequest.ForceSendFields, value)
 				}
 			}
+
+			if d.HasChange("name") {
+				updateExternalLocationRequest.NewName = d.Get("name").(string)
+			}
+
 			// ugly hack until API is fixed
 			if updateExternalLocationRequest.FileEventQueue != nil {
 				if updateExternalLocationRequest.FileEventQueue.ManagedAqs != nil {
